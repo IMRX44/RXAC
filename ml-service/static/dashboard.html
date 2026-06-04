@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RXAC — Live Operations</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #ff5c5c; --ok: #3fb950; --warn: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+         background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; color: var(--accent); letter-spacing: 1px; }
+  .stats { display: flex; gap: 24px; margin-left: auto; font-size: 13px; }
+  .stats b { color: #fff; }
+  .pill { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .pill.ok { background: rgba(63,185,80,.15); color: var(--ok); }
+  .pill.no { background: rgba(255,92,92,.15); color: var(--accent); }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  .panel h2 { font-size: 13px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border);
+              color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: normal; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .anom { font-weight: bold; }
+  .anom.hi { color: var(--accent); } .anom.mid { color: var(--warn); } .anom.lo { color: var(--ok); }
+  .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
+  footer { padding: 12px 24px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>RXAC</h1>
+    <span class="pill" id="model-pill">model: …</span>
+    <div class="stats">
+      <span>events <b id="s-events">0</b></span>
+      <span>flags <b id="s-flags">0</b></span>
+      <span>players <b id="s-players">0</b></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Live flags</h2>
+      <table>
+        <thead><tr><th>Player</th><th>Check</th><th>VL</th><th>Anomaly</th><th>Debug</th></tr></thead>
+        <tbody id="flags"><tr><td class="empty" colspan="5">waiting for data…</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Players by suspicion</h2>
+      <table>
+        <thead><tr><th>Player</th><th>Flags</th><th>Max anomaly</th><th>Total VL</th></tr></thead>
+        <tbody id="players"><tr><td class="empty" colspan="4">waiting for data…</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>RXAC live operations · auto-refresh 3s · honest reminder: no anti-cheat is 100% — review flags before banning.</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function anomClass(a) { return a >= 0.85 ? "hi" : a >= 0.6 ? "mid" : "lo"; }
+function esc(s) { return (s ?? "").toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function refresh() {
+  try {
+    const [stats, flags, players] = await Promise.all([
+      fetch("/api/stats").then(r => r.json()),
+      fetch("/api/flags?limit=60").then(r => r.json()),
+      fetch("/api/players").then(r => r.json()),
+    ]);
+
+    $("s-events").textContent = stats.events;
+    $("s-flags").textContent = stats.flags;
+    $("s-players").textContent = stats.players;
+    const pill = $("model-pill");
+    pill.textContent = "model: " + (stats.model_trained ? "trained" : "heuristic");
+    pill.className = "pill " + (stats.model_trained ? "ok" : "no");
+
+    const fb = $("flags");
+    fb.innerHTML = flags.length ? flags.map(f => `
+      <tr>
+        <td>${esc(f.name)}</td>
+        <td>${esc(f.check)}</td>
+        <td>${(f.vl ?? 0).toFixed(1)}</td>
+        <td class="anom ${anomClass(f.anomaly||0)}">${((f.anomaly||0)*100).toFixed(0)}%</td>
+        <td>${esc(f.debug)}</td>
+      </tr>`).join("") : '<tr><td class="empty" colspan="5">no flags yet</td></tr>';
+
+    const pb = $("players");
+    pb.innerHTML = players.length ? players.map(p => `
+      <tr>
+        <td>${esc(p.name)}</td>
+        <td>${p.flags}</td>
+        <td class="anom ${anomClass(p.max_anomaly||0)}">${((p.max_anomaly||0)*100).toFixed(0)}%</td>
+        <td>${(p.total_vl||0).toFixed(1)}</td>
+      </tr>`).join("") : '<tr><td class="empty" colspan="4">no players yet</td></tr>';
+  } catch (e) {
+    console.error("refresh failed", e);
+  }
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

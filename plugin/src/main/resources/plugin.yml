@@ -1,0 +1,25 @@
+name: RXAC
+version: '${version}'
+main: com.rxac.RXAC
+api-version: '1.20'
+author: RXAC
+description: Full-stack, ML-assisted anti-cheat for movement and combat (1.8-1.26).
+depend:
+  - ProtocolLib
+softdepend:
+  - ViaVersion
+commands:
+  rxac:
+    description: RXAC admin command (alerts, status, reload, vl).
+    usage: /rxac <alerts|status|vl|reload> [player]
+    permission: rxac.admin
+permissions:
+  rxac.admin:
+    description: Access to RXAC admin commands.
+    default: op
+  rxac.alerts:
+    description: Receive RXAC violation alerts.
+    default: op
+  rxac.bypass:
+    description: Bypass all RXAC checks (use with extreme care).
+    default: false

@@ -1,0 +1,123 @@
+# ============================================================
+#  RXAC — configuration
+#  Ship in alert-only mode first. Gather data. Tune. THEN punish.
+# ============================================================
+
+general:
+  # Global on/off.
+  enabled: true
+  # When true, checks only alert staff and never punish (recommended at launch).
+  alert-only: false
+  # Prefix for staff alert messages.
+  prefix: "&8[&cRXAC&8] "
+
+ml:
+  # Stream feature vectors + high-VL events to the ML service for secondary
+  # verification and offline retraining.
+  enabled: true
+  endpoint: "http://127.0.0.1:8000"
+  # Shared secret; must match ML service RXAC_API_KEY.
+  api-key: "change-me"
+  # Minimum local VL before an event is forwarded to ML (saves bandwidth).
+  forward-vl-threshold: 5
+  # If the ML anomaly score exceeds this, add bonus VL to the player.
+  anomaly-threshold: 0.85
+  # How often (ticks) to flush batched feature vectors.
+  flush-interval-ticks: 100
+  # Fail open (don't punish) if the ML service is unreachable.
+  fail-open: true
+
+# Per-check tuning. Each check: enabled, max-vl (before punish), decay (vl/sec),
+# plus check-specific thresholds. Defaults are deliberately conservative.
+checks:
+  movement:
+    speed:
+      enabled: true
+      max-vl: 15
+      decay: 0.25
+      # Tolerance multiplier over the theoretical max horizontal speed.
+      tolerance: 1.08
+    fly:
+      enabled: true
+      max-vl: 12
+      decay: 0.25
+      # Max ticks airborne with non-negative motion before flagging.
+      max-air-ticks: 80
+    nofall:
+      enabled: true
+      max-vl: 8
+      decay: 0.2
+    motion:
+      enabled: true
+      max-vl: 18
+      decay: 0.3
+    timer:
+      enabled: true
+      max-vl: 10
+      decay: 0.2
+      # Allowed packet-rate ratio over real time (1.0 = exact).
+      max-ratio: 1.05
+      sample-window-ms: 1000
+    phase:
+      enabled: true
+      max-vl: 6
+      decay: 0.1
+    jesus:
+      enabled: true
+      max-vl: 10
+      decay: 0.25
+    step:
+      enabled: true
+      max-vl: 10
+      decay: 0.25
+      # Vanilla step height is 0.6; anything above is suspicious.
+      max-step: 0.63
+    velocity:
+      enabled: true
+      max-vl: 10
+      decay: 0.3
+      # Min fraction of expected knockback the player must take.
+      min-horizontal: 0.5
+      min-vertical: 0.5
+  combat:
+    reach:
+      enabled: true
+      max-vl: 12
+      decay: 0.3
+      # Survival max is ~3.0; we allow latency slack.
+      max-reach: 3.12
+    killaura:
+      enabled: true
+      max-vl: 14
+      decay: 0.3
+      # Max simultaneous distinct targets hit in a short window.
+      multi-target-window-ms: 250
+    autoclicker:
+      enabled: true
+      max-vl: 12
+      decay: 0.25
+      # Hard CPS cap and click-interval consistency (low stddev = robot).
+      max-cps: 22
+      min-interval-stddev: 8.0
+    aim:
+      enabled: true
+      max-vl: 12
+      decay: 0.3
+      # GCD (mouse sensitivity quantization) violation sensitivity.
+      min-gcd-errors: 3
+    hitbox:
+      enabled: true
+      max-vl: 10
+      decay: 0.3
+      # Max melee reach used for the look-ray intersection test.
+      max-reach: 3.5
+
+# Punishment ladder. Triggered when a check's VL crosses its max-vl.
+punishments:
+  alert: true
+  kick:
+    enabled: true
+    message: "&cRXAC &7| &fSuspicious activity detected."
+  ban:
+    enabled: false
+    command: "ban %player% RXAC: %check% (vl %vl%)"
