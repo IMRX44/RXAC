@@ -31,6 +31,7 @@ public final class MLBridge {
 
     private final ConcurrentLinkedQueue<JsonObject> queue = new ConcurrentLinkedQueue<>();
     private BukkitTask flushTask;
+    private BukkitTask actionTask;
     private volatile boolean unreachableLogged;
 
     public MLBridge(RXAC plugin) {
@@ -47,10 +48,16 @@ public final class MLBridge {
         // Also stream live feature snapshots for every online player each flush.
         this.flushTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
                 plugin, this::flush, interval, interval);
+
+        // Poll the panel's moderation queue and execute ban/kick/clear actions.
+        long poll = plugin.getConfig().getLong("ml.action-poll-ticks", 40);
+        this.actionTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
+                plugin, this::pollActions, poll, poll);
     }
 
     public void shutdown() {
         if (flushTask != null) flushTask.cancel();
+        if (actionTask != null) actionTask.cancel();
         flush();
     }
 
@@ -123,6 +130,77 @@ public final class MLBridge {
                     }
                     return null;
                 });
+    }
+
+    /** Pull queued moderation actions from the panel and execute them. */
+    private void pollActions() {
+        if (!enabled()) return;
+        String base = plugin.getConfig().getString("ml.endpoint", "http://127.0.0.1:8000");
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(base + "/api/actions/pending"))
+                .timeout(Duration.ofSeconds(3))
+                .header("X-RXAC-Key", plugin.getConfig().getString("ml.api-key", ""))
+                .GET()
+                .build();
+
+        http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(resp -> {
+                    if (resp.statusCode() == 200) executeActions(resp.body());
+                })
+                .exceptionally(t -> null);
+    }
+
+    private void executeActions(String body) {
+        try {
+            JsonElement root = JsonParser.parseString(body);
+            JsonElement arr = root.getAsJsonObject().get("actions");
+            if (arr == null || !arr.isJsonArray()) return;
+
+            for (JsonElement el : arr.getAsJsonArray()) {
+                JsonObject a = el.getAsJsonObject();
+                final String type = a.has("type") ? a.get("type").getAsString() : "";
+                final String reason = a.has("reason") ? a.get("reason").getAsString() : "RXAC";
+                final String by = a.has("by") ? a.get("by").getAsString() : "panel";
+                final UUID uuid = a.has("uuid") ? UUID.fromString(a.get("uuid").getAsString()) : null;
+                final String name = a.has("name") && !a.get("name").isJsonNull()
+                        ? a.get("name").getAsString() : null;
+                if (uuid == null && name == null) continue;
+
+                plugin.getServer().getScheduler().runTask(plugin,
+                        () -> applyAction(type, uuid, name, reason, by));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void applyAction(String type, UUID uuid, String name, String reason, String by) {
+        org.bukkit.entity.Player player = uuid != null
+                ? plugin.getServer().getPlayer(uuid)
+                : plugin.getServer().getPlayerExact(name);
+        String pname = player != null ? player.getName() : name;
+        plugin.getLogger().info("[panel] " + by + " -> " + type + " " + pname + " (" + reason + ")");
+
+        switch (type.toLowerCase()) {
+            case "ban" -> {
+                String cmd = plugin.getConfig().getString("punishments.ban.command",
+                                "ban %player% %reason%")
+                        .replace("%player%", pname == null ? "" : pname)
+                        .replace("%reason%", reason)
+                        .replace("%check%", "panel").replace("%vl%", "0");
+                if (pname != null) plugin.getServer().dispatchCommand(
+                        plugin.getServer().getConsoleSender(), cmd);
+            }
+            case "kick" -> {
+                if (player != null) player.kickPlayer(reason);
+            }
+            case "clearvl" -> {
+                if (player != null) {
+                    PlayerData d = plugin.getPlayerDataManager().get(player);
+                    if (d != null) d.getViolations().clearAll();
+                }
+            }
+            default -> { /* unknown action */ }
+        }
     }
 
     /**

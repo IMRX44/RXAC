@@ -15,7 +15,35 @@ export RXAC_API_KEY=change-me        # must match plugin config.yml ml.api-key
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Dashboard: <http://localhost:8000/>
+Management panel: <http://localhost:8000/>
+
+## Management panel
+
+A full role-based operations panel is served at `/`:
+
+- **Sign in** with one of two roles (credentials from env, see below).
+- **Overview** — top suspects + live flag feed.
+- **Players** — searchable table with a 0–100 *suspicion score*, per-player top
+  checks, and an **Inspect** modal showing the full violation breakdown, recent
+  flags, and moderation actions.
+- **Logs** — filterable violation history (by check / player).
+- **Actions** — Kick / Clear-VL (admin + moderator) and Ban (admin only). The
+  panel queues actions; the plugin polls `/api/actions/pending` and executes
+  them on the server in real time.
+
+### Credentials (set these!)
+
+```bash
+export RXAC_ADMIN_USER=admin     RXAC_ADMIN_PASSWORD=change-me-admin
+export RXAC_MOD_USER=mod         RXAC_MOD_PASSWORD=change-me-mod
+```
+
+Defaults are `admin/admin` and `mod/mod` — change them before exposing the panel.
+
+| Role | Can do |
+|------|--------|
+| moderator | view everything, **kick**, **clear VL** |
+| admin | everything moderators can, plus **ban** |
 
 ## Endpoints
 

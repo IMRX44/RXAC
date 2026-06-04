@@ -15,13 +15,15 @@ from __future__ import annotations
 import csv
 import os
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import auth
 from .features import FEATURE_ORDER
 from .model import AnomalyModel
-from .schemas import IngestRequest, IngestResponse, TrainResponse
+from .schemas import (ActionRequest, IngestRequest, IngestResponse,
+                      LoginRequest, LoginResponse, TrainResponse)
 from .store import TRAIN_CSV, store
 
 API_KEY = os.environ.get("RXAC_API_KEY", "change-me")
@@ -32,8 +34,49 @@ model = AnomalyModel()
 
 
 def _auth(key: str | None) -> None:
+    """Plugin <-> service shared-secret auth."""
     if API_KEY and key != API_KEY:
         raise HTTPException(status_code=401, detail="bad or missing X-RXAC-Key")
+
+
+def _bearer(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:]
+    return authorization
+
+
+def require_role(*allowed: str):
+    """Panel auth dependency enforcing one of the allowed roles."""
+    def dep(authorization: str | None = Header(default=None)) -> dict:
+        sess = auth.session(_bearer(authorization))
+        if not sess:
+            raise HTTPException(status_code=401, detail="login required")
+        if allowed and sess["role"] not in allowed:
+            raise HTTPException(status_code=403, detail="insufficient role")
+        return sess
+    return dep
+
+
+# ----- panel auth -----
+
+@app.post("/api/login", response_model=LoginResponse)
+def login(req: LoginRequest):
+    result = auth.login(req.username, req.password)
+    if not result:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    token, role = result
+    return LoginResponse(token=token, role=role)
+
+
+@app.get("/api/me")
+def me(session: dict = Depends(require_role())):
+    return {"user": session["user"], "role": session["role"]}
+
+
+@app.post("/api/logout")
+def do_logout(authorization: str | None = Header(default=None)):
+    auth.logout(_bearer(authorization))
+    return {"ok": True}
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
@@ -59,20 +102,66 @@ def ingest(req: IngestRequest, x_rxac_key: str | None = Header(default=None)):
 
 
 @app.get("/api/flags")
-def flags(limit: int = 100):
-    return store.recent_flags(limit)
+def flags(limit: int = 100, check: str = None, player: str = None,
+          session: dict = Depends(require_role())):
+    return store.recent_flags(limit, check=check, player=player)
+
+
+@app.get("/api/logs")
+def logs(limit: int = 200, check: str = None, player: str = None,
+         session: dict = Depends(require_role())):
+    return store.recent_flags(limit, check=check, player=player)
 
 
 @app.get("/api/players")
-def players():
+def players(session: dict = Depends(require_role())):
     return store.player_list()
 
 
+@app.get("/api/player/{uuid}")
+def player_detail(uuid: str, session: dict = Depends(require_role())):
+    detail = store.player_detail(uuid)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="unknown player")
+    return detail
+
+
 @app.get("/api/stats")
-def stats():
+def stats(session: dict = Depends(require_role())):
     s = store.stats()
     s["model_trained"] = model.is_trained()
     return s
+
+
+# ----- moderation actions (panel -> queue -> plugin) -----
+
+_ROLE_FOR_ACTION = {"ban": ("admin",), "kick": ("admin", "moderator"),
+                    "clearvl": ("admin", "moderator")}
+
+
+@app.post("/api/action")
+def action(req: ActionRequest, authorization: str | None = Header(default=None)):
+    sess = auth.session(_bearer(authorization))
+    if not sess:
+        raise HTTPException(status_code=401, detail="login required")
+    allowed = _ROLE_FOR_ACTION.get(req.type)
+    if allowed is None:
+        raise HTTPException(status_code=400, detail="unknown action type")
+    if sess["role"] not in allowed:
+        raise HTTPException(status_code=403, detail=f"{req.type} requires {allowed}")
+
+    store.enqueue_action({
+        "uuid": req.uuid, "name": req.name, "type": req.type,
+        "reason": req.reason, "by": sess["user"],
+    })
+    return {"queued": True, "type": req.type, "by": sess["user"]}
+
+
+@app.get("/api/actions/pending")
+def actions_pending(x_rxac_key: str | None = Header(default=None)):
+    """The plugin polls this with the shared key and executes what it finds."""
+    _auth(x_rxac_key)
+    return {"actions": store.drain_actions()}
 
 
 @app.post("/api/train", response_model=TrainResponse)

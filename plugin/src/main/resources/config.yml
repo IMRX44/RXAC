@@ -26,6 +26,8 @@ ml:
   vl-weight: 6.0
   # How often (ticks) to flush batched feature vectors.
   flush-interval-ticks: 100
+  # How often (ticks) to poll the management panel for ban/kick/clear actions.
+  action-poll-ticks: 40
   # Fail open (don't punish) if the ML service is unreachable.
   fail-open: true
 

@@ -41,3 +41,20 @@ class TrainResponse(BaseModel):
     trained: bool
     detail: str
     samples: int = 0
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    token: str
+    role: str
+
+
+class ActionRequest(BaseModel):
+    uuid: str
+    name: Optional[str] = None
+    type: str            # ban | kick | clearvl
+    reason: str = "RXAC"

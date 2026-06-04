@@ -3,114 +3,355 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RXAC — Live Operations</title>
+<title>RXAC — Management Panel</title>
 <style>
   :root {
-    --bg: #0d1117; --panel: #161b22; --border: #30363d;
-    --text: #c9d1d9; --muted: #8b949e; --accent: #ff5c5c; --ok: #3fb950; --warn: #d29922;
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#30363d;
+    --text:#c9d1d9; --muted:#8b949e; --accent:#ff5c5c; --ok:#3fb950;
+    --warn:#d29922; --blue:#58a6ff;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace;
-         background: var(--bg); color: var(--text); }
-  header { padding: 16px 24px; border-bottom: 1px solid var(--border);
-           display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 18px; margin: 0; color: var(--accent); letter-spacing: 1px; }
-  .stats { display: flex; gap: 24px; margin-left: auto; font-size: 13px; }
-  .stats b { color: #fff; }
-  .pill { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-  .pill.ok { background: rgba(63,185,80,.15); color: var(--ok); }
-  .pill.no { background: rgba(255,92,92,.15); color: var(--accent); }
-  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
-  .panel h2 { font-size: 13px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border);
-              color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 16px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: normal; }
-  tr:hover td { background: rgba(255,255,255,.02); }
-  .anom { font-weight: bold; }
-  .anom.hi { color: var(--accent); } .anom.mid { color: var(--warn); } .anom.lo { color: var(--ok); }
-  .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
-  footer { padding: 12px 24px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:ui-monospace,"SF Mono",Menlo,monospace;
+         background:var(--bg); color:var(--text); }
+  button { font-family:inherit; cursor:pointer; border:1px solid var(--border);
+           background:var(--panel2); color:var(--text); border-radius:6px;
+           padding:6px 12px; font-size:12px; }
+  button:hover { border-color:var(--blue); }
+  button.danger { background:rgba(255,92,92,.15); border-color:var(--accent); color:var(--accent); }
+  button.warn { background:rgba(210,153,34,.15); border-color:var(--warn); color:var(--warn); }
+  input { font-family:inherit; background:var(--bg); border:1px solid var(--border);
+          color:var(--text); border-radius:6px; padding:8px 10px; font-size:13px; }
+  .pill { padding:2px 8px; border-radius:10px; font-size:11px; }
+  .pill.ok { background:rgba(63,185,80,.15); color:var(--ok); }
+  .pill.no { background:rgba(255,92,92,.15); color:var(--accent); }
+  .pill.role { background:rgba(88,166,255,.15); color:var(--blue); }
+
+  /* login */
+  #login { display:flex; height:100vh; align-items:center; justify-content:center; }
+  #login .box { background:var(--panel); border:1px solid var(--border);
+                border-radius:10px; padding:32px; width:320px; }
+  #login h1 { color:var(--accent); margin:0 0 4px; letter-spacing:2px; }
+  #login p { color:var(--muted); font-size:12px; margin:0 0 20px; }
+  #login input { width:100%; margin-bottom:10px; }
+  #login button { width:100%; padding:10px; background:var(--accent); color:#0d1117;
+                  border:none; font-weight:bold; }
+  #login .err { color:var(--accent); font-size:12px; min-height:16px; }
+
+  /* app */
+  #app { display:none; }
+  header { padding:14px 24px; border-bottom:1px solid var(--border);
+           display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; margin:0; color:var(--accent); letter-spacing:1px; }
+  nav { display:flex; gap:8px; }
+  nav button.active { border-color:var(--accent); color:#fff; }
+  .spacer { margin-left:auto; }
+  .stats { display:flex; gap:20px; font-size:12px; }
+  .stats b { color:#fff; }
+  main { padding:16px 24px; }
+  .view { display:none; } .view.active { display:block; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px;
+           margin-bottom:16px; overflow:hidden; }
+  .panel h2 { font-size:12px; margin:0; padding:10px 16px; border-bottom:1px solid var(--border);
+              color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 16px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:normal; }
+  tr.clickable { cursor:pointer; } tr.clickable:hover td { background:rgba(255,255,255,.03); }
+  .anom { font-weight:bold; }
+  .anom.hi{color:var(--accent);} .anom.mid{color:var(--warn);} .anom.lo{color:var(--ok);}
+  .empty { padding:20px 16px; color:var(--muted); text-align:center; }
+  .toolbar { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); }
+  .bar { height:8px; background:var(--panel2); border-radius:4px; overflow:hidden; min-width:80px; }
+  .bar > i { display:block; height:100%; background:var(--accent); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .susbadge { font-weight:bold; }
+  .tag { color:var(--muted); }
+  footer { padding:10px 24px; color:var(--muted); font-size:11px; border-top:1px solid var(--border); }
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6);
+              align-items:center; justify-content:center; z-index:50; }
+  .modal-bg.show { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+           width:560px; max-height:80vh; overflow:auto; }
+  .modal .head { display:flex; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border); }
+  .modal .head h3 { margin:0; color:#fff; } .modal .body { padding:16px 18px; }
+  .actions { display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--border); }
 </style>
 </head>
 <body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="box">
+    <h1>RXAC</h1>
+    <p>Management Panel — sign in</p>
+    <input id="u" placeholder="username" autocomplete="username" />
+    <input id="p" type="password" placeholder="password" autocomplete="current-password" />
+    <button id="loginBtn">Sign in</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
   <header>
     <h1>RXAC</h1>
-    <span class="pill" id="model-pill">model: …</span>
+    <nav>
+      <button data-view="overview" class="active">Overview</button>
+      <button data-view="players">Players</button>
+      <button data-view="logs">Logs</button>
+    </nav>
+    <div class="spacer"></div>
     <div class="stats">
       <span>events <b id="s-events">0</b></span>
       <span>flags <b id="s-flags">0</b></span>
       <span>players <b id="s-players">0</b></span>
+      <span class="pill" id="s-model">model</span>
     </div>
+    <span class="pill role" id="who"></span>
+    <button id="logoutBtn">Logout</button>
   </header>
 
   <main>
-    <section class="panel">
-      <h2>Live flags</h2>
-      <table>
-        <thead><tr><th>Player</th><th>Check</th><th>VL</th><th>Anomaly</th><th>Debug</th></tr></thead>
-        <tbody id="flags"><tr><td class="empty" colspan="5">waiting for data…</td></tr></tbody>
-      </table>
-    </section>
+    <!-- OVERVIEW -->
+    <div class="view active" id="view-overview">
+      <div class="grid">
+        <div class="panel">
+          <h2>Top suspects</h2>
+          <table><thead><tr><th>Player</th><th>Flags</th><th>Anomaly</th><th>VL</th></tr></thead>
+          <tbody id="ov-suspects"><tr><td class="empty" colspan="4">…</td></tr></tbody></table>
+        </div>
+        <div class="panel">
+          <h2>Live flags</h2>
+          <table><thead><tr><th>Player</th><th>Check</th><th>VL</th><th>Anomaly</th></tr></thead>
+          <tbody id="ov-flags"><tr><td class="empty" colspan="4">…</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
 
-    <section class="panel">
-      <h2>Players by suspicion</h2>
-      <table>
-        <thead><tr><th>Player</th><th>Flags</th><th>Max anomaly</th><th>Total VL</th></tr></thead>
-        <tbody id="players"><tr><td class="empty" colspan="4">waiting for data…</td></tr></tbody>
-      </table>
-    </section>
+    <!-- PLAYERS -->
+    <div class="view" id="view-players">
+      <div class="panel">
+        <div class="toolbar">
+          <input id="playerSearch" placeholder="search player…" style="flex:1" />
+        </div>
+        <table>
+          <thead><tr><th>Player</th><th>Suspicion</th><th>Flags</th><th>Top checks</th>
+            <th>Anomaly</th><th>VL</th><th></th></tr></thead>
+          <tbody id="playersBody"><tr><td class="empty" colspan="7">…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="view" id="view-logs">
+      <div class="panel">
+        <div class="toolbar">
+          <input id="logCheck" placeholder="filter check (e.g. Reach)" />
+          <input id="logPlayer" placeholder="filter player" style="flex:1" />
+        </div>
+        <table>
+          <thead><tr><th>Time</th><th>Player</th><th>Check</th><th>VL</th><th>Anomaly</th><th>Detail</th></tr></thead>
+          <tbody id="logsBody"><tr><td class="empty" colspan="6">…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </main>
 
-  <footer>RXAC live operations · auto-refresh 3s · honest reminder: no anti-cheat is 100% — review flags before banning.</footer>
+  <footer>RXAC management panel · roles: admin (ban) / moderator (kick, clear) · honest reminder: review evidence before banning.</footer>
+</div>
+
+<!-- PLAYER DETAIL MODAL -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="head"><h3 id="m-name">player</h3>
+      <div class="spacer" style="margin-left:auto"></div>
+      <span class="pill" id="m-banned"></span></div>
+    <div class="body">
+      <div id="m-summary" class="tag" style="margin-bottom:12px"></div>
+      <div class="panel" style="margin:0 0 12px">
+        <h2>Violation breakdown</h2>
+        <table><tbody id="m-checks"></tbody></table>
+      </div>
+      <div class="panel" style="margin:0">
+        <h2>Recent flags</h2>
+        <table><tbody id="m-recent"></tbody></table>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="warn" id="m-kick">Kick</button>
+      <button class="warn" id="m-clear">Clear VL</button>
+      <button class="danger" id="m-ban">Ban</button>
+      <div class="spacer" style="margin-left:auto"></div>
+      <button id="m-close">Close</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
+let TOKEN = localStorage.getItem("rxac_token") || null;
+let ROLE = localStorage.getItem("rxac_role") || null;
+let CUR = null; // currently inspected player
 
-function anomClass(a) { return a >= 0.85 ? "hi" : a >= 0.6 ? "mid" : "lo"; }
-function esc(s) { return (s ?? "").toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function authHeaders() { return TOKEN ? { "Authorization": "Bearer " + TOKEN } : {}; }
+function esc(s){ return (s ?? "").toString().replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function anomClass(a){ return a>=0.85?"hi":a>=0.6?"mid":"lo"; }
+function suspicion(p){ return Math.round(Math.min(100, (p.flags||0)*4 + (p.max_anomaly||0)*60 + (p.total_vl||0))); }
+function topChecks(p){ const c=p.checks||{}; return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,3)
+  .map(([k,v])=>`${esc(k)}·${v}`).join(", ") || "—"; }
 
+async function api(path, opts={}) {
+  const r = await fetch(path, { ...opts, headers:{ "Content-Type":"application/json", ...authHeaders(), ...(opts.headers||{}) }});
+  if (r.status === 401) { doLogout(); throw new Error("unauthorized"); }
+  return r;
+}
+
+// ---- login ----
+async function login() {
+  $("loginErr").textContent = "";
+  const r = await fetch("/api/login", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ username:$("u").value, password:$("p").value }) });
+  if (!r.ok) { $("loginErr").textContent = "Invalid credentials"; return; }
+  const d = await r.json();
+  TOKEN = d.token; ROLE = d.role;
+  localStorage.setItem("rxac_token", TOKEN); localStorage.setItem("rxac_role", ROLE);
+  showApp();
+}
+function doLogout() {
+  if (TOKEN) fetch("/api/logout", { method:"POST", headers: authHeaders() }).catch(()=>{});
+  TOKEN = ROLE = null; localStorage.removeItem("rxac_token"); localStorage.removeItem("rxac_role");
+  $("app").style.display="none"; $("login").style.display="flex";
+}
+function showApp() {
+  $("login").style.display="none"; $("app").style.display="block";
+  $("who").textContent = ROLE;
+  // moderators can't ban
+  refresh();
+}
+
+// ---- views ----
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("view-"+b.dataset.view).classList.add("active");
+  refresh();
+});
+
+// ---- data refresh ----
 async function refresh() {
   try {
-    const [stats, flags, players] = await Promise.all([
-      fetch("/api/stats").then(r => r.json()),
-      fetch("/api/flags?limit=60").then(r => r.json()),
-      fetch("/api/players").then(r => r.json()),
+    const [stats, players, flags] = await Promise.all([
+      api("/api/stats").then(r=>r.json()),
+      api("/api/players").then(r=>r.json()),
+      api("/api/flags?limit=50").then(r=>r.json()),
     ]);
-
     $("s-events").textContent = stats.events;
     $("s-flags").textContent = stats.flags;
     $("s-players").textContent = stats.players;
-    const pill = $("model-pill");
-    pill.textContent = "model: " + (stats.model_trained ? "trained" : "heuristic");
-    pill.className = "pill " + (stats.model_trained ? "ok" : "no");
+    const m = $("s-model"); m.textContent = "model: "+(stats.model_trained?"trained":"heuristic");
+    m.className = "pill "+(stats.model_trained?"ok":"no");
 
-    const fb = $("flags");
-    fb.innerHTML = flags.length ? flags.map(f => `
-      <tr>
-        <td>${esc(f.name)}</td>
-        <td>${esc(f.check)}</td>
-        <td>${(f.vl ?? 0).toFixed(1)}</td>
-        <td class="anom ${anomClass(f.anomaly||0)}">${((f.anomaly||0)*100).toFixed(0)}%</td>
-        <td>${esc(f.debug)}</td>
-      </tr>`).join("") : '<tr><td class="empty" colspan="5">no flags yet</td></tr>';
-
-    const pb = $("players");
-    pb.innerHTML = players.length ? players.map(p => `
-      <tr>
-        <td>${esc(p.name)}</td>
-        <td>${p.flags}</td>
-        <td class="anom ${anomClass(p.max_anomaly||0)}">${((p.max_anomaly||0)*100).toFixed(0)}%</td>
-        <td>${(p.total_vl||0).toFixed(1)}</td>
-      </tr>`).join("") : '<tr><td class="empty" colspan="4">no players yet</td></tr>';
-  } catch (e) {
-    console.error("refresh failed", e);
-  }
+    renderSuspects(players); renderOvFlags(flags);
+    renderPlayers(players); renderLogs();
+  } catch(e) {}
 }
 
-refresh();
-setInterval(refresh, 3000);
+function renderSuspects(players) {
+  const rows = players.slice(0,8);
+  $("ov-suspects").innerHTML = rows.length ? rows.map(p=>`
+    <tr class="clickable" onclick="openPlayer('${p.uuid}')">
+      <td>${esc(p.name)}</td><td>${p.flags}</td>
+      <td class="anom ${anomClass(p.max_anomaly||0)}">${Math.round((p.max_anomaly||0)*100)}%</td>
+      <td>${(p.total_vl||0).toFixed(1)}</td></tr>`).join("")
+    : '<tr><td class="empty" colspan="4">no players yet</td></tr>';
+}
+function renderOvFlags(flags) {
+  $("ov-flags").innerHTML = flags.length ? flags.slice(0,12).map(f=>`
+    <tr><td>${esc(f.name)}</td><td>${esc(f.check)}</td><td>${(f.vl||0).toFixed(1)}</td>
+    <td class="anom ${anomClass(f.anomaly||0)}">${Math.round((f.anomaly||0)*100)}%</td></tr>`).join("")
+    : '<tr><td class="empty" colspan="4">no flags yet</td></tr>';
+}
+function renderPlayers(players) {
+  const q = ($("playerSearch").value||"").toLowerCase();
+  const rows = players.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
+  $("playersBody").innerHTML = rows.length ? rows.map(p=>{
+    const s = suspicion(p);
+    return `<tr class="clickable" onclick="openPlayer('${p.uuid}')">
+      <td>${esc(p.name)}${p.banned?' <span class="pill no">banned</span>':''}</td>
+      <td><div class="bar"><i style="width:${s}%"></i></div><span class="susbadge">${s}</span></td>
+      <td>${p.flags}</td><td class="tag">${topChecks(p)}</td>
+      <td class="anom ${anomClass(p.max_anomaly||0)}">${Math.round((p.max_anomaly||0)*100)}%</td>
+      <td>${(p.total_vl||0).toFixed(1)}</td>
+      <td><button onclick="event.stopPropagation();openPlayer('${p.uuid}')">Inspect</button></td></tr>`;
+  }).join("") : '<tr><td class="empty" colspan="7">no players</td></tr>';
+}
+async function renderLogs() {
+  const c = encodeURIComponent($("logCheck").value||"");
+  const pl = encodeURIComponent($("logPlayer").value||"");
+  const flags = await api(`/api/logs?limit=200&check=${c}&player=${pl}`).then(r=>r.json());
+  $("logsBody").innerHTML = flags.length ? flags.map(f=>`
+    <tr><td class="tag">${new Date(f.ts||Date.now()).toLocaleTimeString()}</td>
+    <td>${esc(f.name)}</td><td>${esc(f.check)}</td><td>${(f.vl||0).toFixed(1)}</td>
+    <td class="anom ${anomClass(f.anomaly||0)}">${Math.round((f.anomaly||0)*100)}%</td>
+    <td class="tag">${esc(f.debug)}</td></tr>`).join("")
+    : '<tr><td class="empty" colspan="6">no logs</td></tr>';
+}
+$("playerSearch").oninput = () => api("/api/players").then(r=>r.json()).then(renderPlayers);
+$("logCheck").oninput = renderLogs; $("logPlayer").oninput = renderLogs;
+
+// ---- player detail + actions ----
+async function openPlayer(uuid) {
+  const d = await api("/api/player/"+uuid).then(r=>r.json()).catch(()=>null);
+  if (!d) return;
+  CUR = d;
+  $("m-name").textContent = d.name;
+  $("m-banned").textContent = d.banned ? "BANNED" : "";
+  $("m-banned").className = "pill " + (d.banned ? "no" : "");
+  const s = suspicion(d);
+  $("m-summary").textContent = `suspicion ${s}/100 · flags ${d.flags} · max anomaly ${Math.round((d.max_anomaly||0)*100)}% · total VL ${(d.total_vl||0).toFixed(1)}`;
+  const checks = Object.entries(d.checks||{}).sort((a,b)=>b[1]-a[1]);
+  $("m-checks").innerHTML = checks.length ? checks.map(([k,v])=>`
+    <tr><td>${esc(k)}</td><td><div class="bar"><i style="width:${Math.min(100,v*8)}%"></i></div></td>
+    <td style="text-align:right">${v}</td></tr>`).join("")
+    : '<tr><td class="empty" colspan="3">no violations</td></tr>';
+  $("m-recent").innerHTML = (d.recent||[]).length ? d.recent.slice(0,20).map(f=>`
+    <tr><td class="tag">${new Date(f.ts||Date.now()).toLocaleTimeString()}</td>
+    <td>${esc(f.check)}</td><td>${(f.vl||0).toFixed(1)}</td><td class="tag">${esc(f.debug)}</td></tr>`).join("")
+    : '<tr><td class="empty" colspan="4">no recent flags</td></tr>';
+  // role gating: only admin sees ban
+  $("m-ban").style.display = ROLE === "admin" ? "" : "none";
+  $("modalBg").classList.add("show");
+}
+function closeModal(){ $("modalBg").classList.remove("show"); CUR=null; }
+$("m-close").onclick = closeModal;
+$("modalBg").onclick = (e) => { if (e.target === $("modalBg")) closeModal(); };
+
+async function doAction(type) {
+  if (!CUR) return;
+  const reason = prompt(`Reason for ${type} on ${CUR.name}?`, "RXAC: cheating");
+  if (reason === null) return;
+  const r = await api("/api/action", { method:"POST",
+    body: JSON.stringify({ uuid:CUR.uuid, name:CUR.name, type, reason }) });
+  if (r.ok) { alert(`${type} queued for ${CUR.name}`); closeModal(); refresh(); }
+  else { const e = await r.json().catch(()=>({detail:"error"})); alert("Failed: "+e.detail); }
+}
+$("m-kick").onclick = () => doAction("kick");
+$("m-clear").onclick = () => doAction("clearvl");
+$("m-ban").onclick = () => doAction("ban");
+
+// ---- boot ----
+$("loginBtn").onclick = login;
+$("p").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+$("logoutBtn").onclick = doLogout;
+if (TOKEN) {
+  // validate token
+  fetch("/api/me", { headers: authHeaders() }).then(r => {
+    if (r.ok) { r.json().then(d => { ROLE = d.role; showApp(); }); }
+    else doLogout();
+  }).catch(doLogout);
+}
+setInterval(() => { if (TOKEN && $("app").style.display !== "none") refresh(); }, 4000);
 </script>
 </body>
 </html>

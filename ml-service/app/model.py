@@ -11,9 +11,10 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-import numpy as np
-
 from .features import FEATURE_ORDER, to_vector
+
+# numpy / scikit-learn are imported lazily so the service (and its heuristic
+# fallback) runs even before the heavy ML dependencies are installed.
 
 MODEL_PATH = os.environ.get("RXAC_MODEL_PATH", "models/anomaly.joblib")
 
@@ -46,6 +47,7 @@ class AnomalyModel:
         from sklearn.pipeline import Pipeline
         from sklearn.preprocessing import StandardScaler
         import joblib
+        import numpy as np
 
         if len(vectors) < 50:
             raise ValueError("need at least 50 samples to train a useful model")

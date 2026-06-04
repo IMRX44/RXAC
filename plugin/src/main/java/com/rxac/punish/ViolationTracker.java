@@ -77,6 +77,11 @@ public final class ViolationTracker {
         return e.vl;
     }
 
+    /** Wipe all violation levels (moderator "clear VL" action). */
+    public synchronized void clearAll() {
+        entries.clear();
+    }
+
     /** Sum of all decayed VLs — a coarse "how sus is this player" score. */
     public synchronized double totalVl() {
         double total = 0;
