@@ -24,10 +24,17 @@ class IngestRequest(BaseModel):
     events: List[Event]
 
 
+class Verdict(BaseModel):
+    uuid: str
+    name: Optional[str] = None
+    anomaly: float
+
+
 class IngestResponse(BaseModel):
     received: int
     scored: int
     flagged: int
+    verdicts: List[Verdict] = Field(default_factory=list)
 
 
 class TrainResponse(BaseModel):

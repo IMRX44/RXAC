@@ -5,12 +5,15 @@ import com.rxac.check.AttackContext;
 import com.rxac.check.Check;
 import com.rxac.check.CheckCategory;
 import com.rxac.player.PlayerData;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.util.Vector;
 
 /**
- * Flags attacks that land beyond the maximum survival reach. The distance is
- * measured from the attacker's eye to the nearest point of the target's
- * bounding box (computed in {@link com.rxac.listener.CombatListener}), so it is
- * latency-tolerant but rejects the inflated reach of reach hacks.
+ * Reach with attacker-side latency rewind. Instead of measuring from a single
+ * eye position, we take the <b>minimum</b> distance from the attacker's recent
+ * eye positions (within a ping-bounded window) to the target's hitbox. This
+ * gives the player the full benefit of their own latency, so legitimate hits
+ * never false-flag — yet a reach hack still exceeds the cap from every sample.
  */
 public final class ReachCheck extends Check {
 
@@ -20,18 +23,28 @@ public final class ReachCheck extends Check {
 
     @Override
     public void onAttack(PlayerData data, AttackContext ctx) {
-        double max = cfgDouble("max-reach", 3.12);
-
-        // Ping-aware slack: a lagging player's target may be slightly stale, so
-        // we widen the allowance with latency (capped) to avoid false flags.
+        double max = cfgDouble("max-reach", 3.04);
         int ping = safePing(data);
-        double pingSlack = Math.min(cfgDouble("max-ping-slack", 0.5), ping * 0.0016);
-        double allowed = max + pingSlack;
+        long window = (long) Math.min(cfgDouble("max-rewind-ms", 300), ping + 60);
 
-        double reach = ctx.getReach();
-        if (reach > allowed) {
-            fail(data, Math.min(3.0, 1 + (reach - allowed) * 4),
-                    String.format("reach=%.3f>%.2f (ping=%d)", reach, allowed, ping));
+        BoundingBox box = ctx.getTarget().getBoundingBox();
+        double best = ctx.getReach();   // fallback: event-time distance
+
+        long now = ctx.getTime();
+        for (double[] s : data.getRecentPositions()) {
+            if (now - s[3] > window) continue;
+            // Eye position from a recent feet sample (~1.62 standing eye height).
+            double ex = s[0], ey = s[1] + 1.62, ez = s[2];
+            double cx = clamp(ex, box.getMinX(), box.getMaxX());
+            double cy = clamp(ey, box.getMinY(), box.getMaxY());
+            double cz = clamp(ez, box.getMinZ(), box.getMaxZ());
+            double d = new Vector(ex - cx, ey - cy, ez - cz).length();
+            if (d < best) best = d;
+        }
+
+        if (best > max) {
+            fail(data, Math.min(3.0, 1 + (best - max) * 5),
+                    String.format("reach=%.3f>%.2f (ping=%d)", best, max, ping));
         } else {
             reward(data, 0.5);
         }
@@ -41,7 +54,11 @@ public final class ReachCheck extends Check {
         try {
             return Math.max(0, data.getPlayer().getPing());
         } catch (Throwable t) {
-            return 0;   // getPing() may be unavailable on some forks
+            return 0;
         }
+    }
+
+    private static double clamp(double v, double min, double max) {
+        return v < min ? min : Math.min(v, max);
     }
 }

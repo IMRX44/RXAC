@@ -99,6 +99,7 @@ public final class PacketListener {
                     if (data.ticksSinceVelocity != Integer.MAX_VALUE) data.ticksSinceVelocity++;
                     data.lastMovementMs = now;
 
+                    data.registerPositionSample(now);
                     rxac.getSetbackManager().markSafe(data);
                     rxac.getCheckManager().dispatchMovement(data);
                 });

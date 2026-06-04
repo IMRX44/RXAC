@@ -1,13 +1,16 @@
 package com.rxac.ml;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.rxac.RXAC;
 import com.rxac.check.Check;
 import com.rxac.player.PlayerData;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.net.URI;
+import java.util.UUID;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -107,7 +110,10 @@ public final class MLBridge {
                 .build();
 
         http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(resp -> unreachableLogged = false)
+                .thenAccept(resp -> {
+                    unreachableLogged = false;
+                    if (resp.statusCode() == 200) applyVerdicts(resp.body());
+                })
                 .exceptionally(t -> {
                     if (!unreachableLogged) {
                         boolean failOpen = plugin.getConfig().getBoolean("ml.fail-open", true);
@@ -117,5 +123,40 @@ public final class MLBridge {
                     }
                     return null;
                 });
+    }
+
+    /**
+     * Parse the service's per-player anomaly verdicts and raise the AI check's
+     * violation level for anyone scoring above the configured threshold. Runs
+     * the actual VL mutation on the main thread.
+     */
+    private void applyVerdicts(String body) {
+        double threshold = plugin.getConfig().getDouble("ml.anomaly-threshold", 0.85);
+        double weight = plugin.getConfig().getDouble("ml.vl-weight", 6.0);
+        try {
+            JsonElement root = JsonParser.parseString(body);
+            if (!root.isJsonObject()) return;
+            JsonElement verdicts = root.getAsJsonObject().get("verdicts");
+            if (verdicts == null || !verdicts.isJsonArray()) return;
+
+            for (JsonElement el : verdicts.getAsJsonArray()) {
+                JsonObject v = el.getAsJsonObject();
+                double anomaly = v.has("anomaly") ? v.get("anomaly").getAsDouble() : 0;
+                if (anomaly < threshold) continue;
+                final UUID uuid = UUID.fromString(v.get("uuid").getAsString());
+                final double amount = (anomaly - threshold) / Math.max(1e-6, 1 - threshold) * weight;
+
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    PlayerData data = plugin.getPlayerDataManager().get(uuid);
+                    Check ai = plugin.getCheckManager().getByName("AI");
+                    if (data != null && ai != null && ai.isEnabled()) {
+                        data.getViolations().fail(ai, amount,
+                                String.format("anomaly=%.2f", anomaly));
+                    }
+                });
+            }
+        } catch (Exception ignored) {
+            // Malformed/empty response: ignore (fail-open).
+        }
     }
 }

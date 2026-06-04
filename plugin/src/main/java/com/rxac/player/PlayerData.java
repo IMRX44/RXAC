@@ -57,9 +57,13 @@ public final class PlayerData {
 
     // --- Combat ---------------------------------------------------------------
     public long lastAttackMs;
+    public long lastSwingMs;
     public long lastBlockPlaceMs;
     public long bowDrawStartMs;
     public int lastTargetId = -1;
+
+    // Recent feet positions {x, y, z, timeMs} for attacker-side reach rewind.
+    private final Deque<double[]> recentPositions = new ArrayDeque<>();
     private final Deque<long[]> recentTargets = new ArrayDeque<>();      // {entityId, timeMs}
 
     // --- Velocity / knockback -------------------------------------------------
@@ -117,11 +121,23 @@ public final class PlayerData {
     }
 
     public void registerClick(long now) {
+        lastSwingMs = now;
         clickTimes.addLast(now);
         while (!clickTimes.isEmpty() && now - clickTimes.peekFirst() > 1000L) {
             clickTimes.pollFirst();
         }
     }
+
+    /** Snapshot the current position for the reach-rewind window. */
+    public void registerPositionSample(long now) {
+        recentPositions.addLast(new double[]{x, y, z, now});
+        while (!recentPositions.isEmpty() && now - recentPositions.peekFirst()[3] > 500L) {
+            recentPositions.pollFirst();
+        }
+        while (recentPositions.size() > 25) recentPositions.pollFirst();
+    }
+
+    public Deque<double[]> getRecentPositions() { return recentPositions; }
 
     /** Clicks in the last second == CPS. */
     public int cps() {

@@ -20,8 +20,10 @@ ml:
   api-key: "change-me"
   # Minimum local VL before an event is forwarded to ML (saves bandwidth).
   forward-vl-threshold: 5
-  # If the ML anomaly score exceeds this, add bonus VL to the player.
+  # If the ML anomaly score exceeds this, raise the AI check's VL.
   anomaly-threshold: 0.85
+  # VL added at anomaly==1.0 (scaled down toward the threshold).
+  vl-weight: 6.0
   # How often (ticks) to flush batched feature vectors.
   flush-interval-ticks: 100
   # Fail open (don't punish) if the ML service is unreachable.
@@ -100,10 +102,11 @@ checks:
       enabled: true
       max-vl: 12
       decay: 0.3
-      # Survival max is ~3.0; we allow latency slack.
-      max-reach: 3.12
-      # Extra reach (blocks) granted per ms of ping, capped by max-ping-slack.
-      max-ping-slack: 0.5
+      # Survival melee max is ~3.0. We rewind across the attacker's recent eye
+      # positions and take the MINIMUM distance, so latency never false-flags.
+      max-reach: 3.04
+      # Attacker-side rewind window (ms), clamped by the player's ping.
+      max-rewind-ms: 300
     fastbow:
       enabled: true
       max-vl: 10
@@ -114,6 +117,13 @@ checks:
       decay: 0.3
       # Max simultaneous distinct targets hit in a short window.
       multi-target-window-ms: 250
+      # Max angle (deg) between look direction and target (view cone).
+      max-fov: 75.0
+      # Flag hits where line-of-sight to the target is blocked by blocks.
+      wall-check: true
+      # Flag hits with no arm-swing within this many ms beforehand.
+      swing-check: true
+      max-swing-gap-ms: 400
     autoclicker:
       enabled: true
       max-vl: 12
@@ -155,12 +165,21 @@ checks:
       max-per-second: 8
       # Max angle (deg) between look direction and the broken block.
       max-angle: 75.0
+    ai:
+      # Behavioral-AI verdict, raised by the ML service. Keep max-vl high so
+      # the model nudges rather than instantly bans; tune after collecting data.
+      enabled: true
+      max-vl: 25
+      decay: 0.5
 
 # Setback / rubber-band. When a high-confidence movement violation occurs the
 # player is teleported back to their last valid position, neutralizing movement
 # cheats in real time. Off by default — enable after tuning prediction tolerances.
 setback:
-  enabled: false
+  # Enabled for high-confidence Fly/Scaffold/Prediction violations. If you see
+  # legitimate players rubber-banding, raise the prediction tolerances or set
+  # this back to false until the physics is tuned for your server.
+  enabled: true
   cooldown-ms: 400
   log: true
 

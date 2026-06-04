@@ -73,14 +73,21 @@ class AnomalyModel:
 
     # --- inference --------------------------------------------------------
     def score(self, features: dict) -> float:
-        """Return an anomaly score in [0, 1]; higher is more suspicious."""
-        vec = to_vector(features)
+        """Return an anomaly score in [0, 1]; higher is more suspicious.
+
+        When a model is trained we ensemble it with the transparent heuristic so
+        a single weak signal from either source still surfaces — and obvious red
+        flags (the heuristic) are never silently smoothed away by the model.
+        """
+        heur = self._heuristic(features)
         if self._pipeline is not None:
+            vec = to_vector(features)
             # IsolationForest.decision_function: higher = more normal.
             raw = float(self._pipeline.decision_function([vec])[0])
-            # Map roughly [-0.5, 0.5] -> [1, 0] and clamp.
-            return float(min(1.0, max(0.0, 0.5 - raw)))
-        return self._heuristic(features)
+            iforest = float(min(1.0, max(0.0, 0.5 - raw)))
+            # Weighted blend, but let a strong heuristic dominate.
+            return float(max(0.7 * iforest + 0.3 * heur, heur * 0.9))
+        return heur
 
     @staticmethod
     def _heuristic(f: dict) -> float:

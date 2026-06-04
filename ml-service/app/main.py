@@ -40,12 +40,22 @@ def _auth(key: str | None) -> None:
 def ingest(req: IngestRequest, x_rxac_key: str | None = Header(default=None)):
     _auth(x_rxac_key)
     scored = flagged = 0
+    # Aggregate the worst anomaly per player in this batch -> verdicts.
+    worst: dict[str, dict] = {}
     for ev in req.events:
         anomaly = model.score(ev.features)
         scored += 1
         if store.add_event(ev.model_dump(), anomaly):
             flagged += 1
-    return IngestResponse(received=len(req.events), scored=scored, flagged=flagged)
+        cur = worst.get(ev.uuid)
+        if cur is None or anomaly > cur["anomaly"]:
+            worst[ev.uuid] = {"uuid": ev.uuid, "name": ev.name, "anomaly": anomaly}
+    return IngestResponse(
+        received=len(req.events),
+        scored=scored,
+        flagged=flagged,
+        verdicts=list(worst.values()),
+    )
 
 
 @app.get("/api/flags")

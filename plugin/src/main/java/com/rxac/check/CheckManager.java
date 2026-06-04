@@ -48,6 +48,16 @@ public final class CheckManager {
         checks.add(new ScaffoldCheck(plugin));
         checks.add(new FastPlaceCheck(plugin));
         checks.add(new NukerCheck(plugin));
+        // Behavioral AI (fed by the ML service)
+        checks.add(new AICheck(plugin));
+    }
+
+    /** Look up a check by its name (used by the ML feedback loop). */
+    public Check getByName(String name) {
+        for (Check c : checks) {
+            if (c.getName().equalsIgnoreCase(name)) return c;
+        }
+        return null;
     }
 
     public void reloadAll() {

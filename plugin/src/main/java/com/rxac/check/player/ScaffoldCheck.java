@@ -9,10 +9,13 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
 /**
- * Scaffold detection. Legitimate bridging requires looking down at the block
- * face you place against. Scaffold hacks bridge while looking forward (or even
- * away) and place blocks faster than a human can. We flag placements made
- * below the player while the pitch is too shallow, especially in rapid bursts.
+ * Multi-signal Scaffold detection. Legitimate bridging means looking down at the
+ * face you place against, at a human cadence. Scaffold hacks bridge while facing
+ * forward (or away), place against the air behind them, snap their rotation onto
+ * the face for a single tick, and place at robotic, fixed intervals.
+ *
+ * <p>Each independent signal contributes violation level; combined signals on a
+ * single placement escalate quickly and (if enabled) trigger a setback.</p>
  */
 public final class ScaffoldCheck extends Check {
 
@@ -26,22 +29,52 @@ public final class ScaffoldCheck extends Check {
         Block placed = ctx.getPlaced();
 
         boolean below = placed.getY() < Math.floor(p.getLocation().getY());
-        if (!below) { reward(data, 0.5); return; }
-
-        // Bridging downward but the player is not looking down enough to see the
-        // face they claim to place against.
-        float pitch = p.getLocation().getPitch();
-        double minPitch = cfgDouble("min-down-pitch", 30.0);
-
         long since = ctx.getTime() - data.lastBlockPlaceMs;
         data.lastBlockPlaceMs = ctx.getTime();
-        boolean rapid = since < cfgInt("min-place-interval-ms", 110);
+        if (!below) { reward(data, 0.4); return; }
 
-        if (pitch < minPitch) {
-            double amount = rapid ? 2.0 : 1.0;
-            fail(data, amount, String.format("pitch=%.1f%s", pitch, rapid ? " rapid" : ""));
+        int signals = 0;
+        StringBuilder why = new StringBuilder();
+        float pitch = p.getLocation().getPitch();
+
+        // Signal A: not looking down enough to see the face being placed against.
+        if (pitch < cfgDouble("min-down-pitch", 30.0)) {
+            signals++; why.append("pitch=").append(String.format("%.0f ", pitch));
+        }
+
+        // Signal B: rotation snap onto the face for a single tick (aim-then-place).
+        if (data.deltaYaw > 25 && data.lastDeltaYaw() < 3) {
+            signals++; why.append("snap ");
+        }
+
+        // Signal C: moving opposite to where the player is facing (placing behind).
+        double moveYaw = Math.toDegrees(Math.atan2(-data.deltaX, data.deltaZ));
+        double diff = Math.abs(wrap(moveYaw - p.getLocation().getYaw()));
+        if (data.horizontalSpeed() > 0.12 && diff > 100) {
+            signals++; why.append(String.format("behind=%.0f ", diff));
+        }
+
+        // Signal D: robotic placement cadence (very regular fast bursts).
+        if (since > 0 && since < cfgInt("min-place-interval-ms", 110)) {
+            signals++; why.append("rapid ");
+        }
+
+        if (signals >= 1) {
+            // Escalate sharply when multiple independent signals agree.
+            double amount = signals >= 2 ? 2.5 : 1.0;
+            fail(data, amount, why.toString().trim() + " sig=" + signals);
+            if (signals >= 2) {
+                plugin.getSetbackManager().setback(data, "Scaffold");
+            }
         } else {
             reward(data, 0.3);
         }
+    }
+
+    private static double wrap(double a) {
+        a %= 360.0;
+        if (a >= 180) a -= 360;
+        if (a < -180) a += 360;
+        return a;
     }
 }
