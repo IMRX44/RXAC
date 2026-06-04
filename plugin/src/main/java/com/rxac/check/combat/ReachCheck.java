@@ -24,7 +24,7 @@ public final class ReachCheck extends Check {
     @Override
     public void onAttack(PlayerData data, AttackContext ctx) {
         double max = cfgDouble("max-reach", 3.04);
-        int ping = safePing(data);
+        int ping = data.latencyMs();   // precise transaction ping when available
         long window = (long) Math.min(cfgDouble("max-rewind-ms", 300), ping + 60);
 
         BoundingBox box = ctx.getTarget().getBoundingBox();
@@ -47,14 +47,6 @@ public final class ReachCheck extends Check {
                     String.format("reach=%.3f>%.2f (ping=%d)", best, max, ping));
         } else {
             reward(data, 0.5);
-        }
-    }
-
-    private int safePing(PlayerData data) {
-        try {
-            return Math.max(0, data.getPlayer().getPing());
-        } catch (Throwable t) {
-            return 0;
         }
     }
 

@@ -36,6 +36,8 @@ public final class CheckManager {
         checks.add(new JesusCheck(plugin));
         checks.add(new StepCheck(plugin));
         checks.add(new NoSlowCheck(plugin));
+        checks.add(new SpiderCheck(plugin));
+        checks.add(new BadPacketsCheck(plugin));
         checks.add(new PredictionCheck(plugin));
         // Combat
         checks.add(new ReachCheck(plugin));

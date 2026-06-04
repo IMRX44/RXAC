@@ -6,7 +6,10 @@ import com.rxac.player.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
+import java.util.List;
 import java.util.Locale;
 
 /** Centralizes alerts and the punishment ladder (alert → kick → ban). */
@@ -40,6 +43,34 @@ public final class PunishmentManager {
             }
             plugin.getLogger().info("[ALERT] " + ChatColor.stripColor(msg));
         });
+    }
+
+    /**
+     * "Mess with the cheater" — apply non-lethal mitigations (slowness,
+     * blindness, mining fatigue, nausea) while suspicion is high but before a
+     * ban. Configured as a list of {@code TYPE:amplifier} under
+     * {@code punishments.mitigation.effects}.
+     */
+    public void mitigate(PlayerData data, Check check) {
+        List<String> effects = plugin.getConfig().getStringList("punishments.mitigation.effects");
+        if (effects.isEmpty()) return;
+        int durationTicks = plugin.getConfig().getInt("punishments.mitigation.duration-ticks", 100);
+
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player player = data.getPlayer();
+            if (player == null || !player.isOnline()) return;
+            for (String spec : effects) {
+                String[] parts = spec.split(":");
+                PotionEffectType type = PotionEffectType.getByName(parts[0].trim().toUpperCase(Locale.ROOT));
+                if (type == null) continue;
+                int amp = parts.length > 1 ? parseInt(parts[1], 0) : 0;
+                player.addPotionEffect(new PotionEffect(type, durationTicks, amp, false, false));
+            }
+        });
+    }
+
+    private static int parseInt(String s, int def) {
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return def; }
     }
 
     /** Execute the configured punishment for a check that exceeded its max VL. */

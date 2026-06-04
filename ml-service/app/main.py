@@ -14,14 +14,16 @@ from __future__ import annotations
 
 import csv
 import os
+import threading
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth
-from .features import FEATURE_ORDER
+from .features import FEATURE_ORDER, to_vector
 from .model import AnomalyModel
+from .online import online
 from .schemas import (ActionRequest, IngestRequest, IngestResponse,
                       LoginRequest, LoginResponse, TrainResponse)
 from .store import TRAIN_CSV, store
@@ -31,6 +33,39 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
 app = FastAPI(title="RXAC ML Service", version="0.1.0")
 model = AnomalyModel()
+
+# Auto-retrain: after this many fresh clean samples, retrain in the background
+# so the model keeps adapting to the server without any manual step.
+AUTO_RETRAIN_EVERY = int(os.environ.get("RXAC_AUTO_RETRAIN_EVERY", "750"))
+_clean_since_train = 0
+_training = False
+
+
+def _maybe_auto_retrain() -> None:
+    """Kick a background retrain once enough new clean data has accumulated."""
+    global _clean_since_train, _training
+    if _training or _clean_since_train < AUTO_RETRAIN_EVERY:
+        return
+    if not os.path.exists(TRAIN_CSV):
+        return
+    _training = True
+    _clean_since_train = 0
+
+    def _run():
+        global _training
+        try:
+            vectors = []
+            with open(TRAIN_CSV, newline="") as fh:
+                for row in csv.DictReader(fh):
+                    if row.get("label") == "0":
+                        vectors.append([float(row[n]) for n in FEATURE_ORDER])
+            model.train(vectors)
+        except Exception:
+            pass
+        finally:
+            _training = False
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _auth(key: str | None) -> None:
@@ -82,17 +117,26 @@ def do_logout(authorization: str | None = Header(default=None)):
 @app.post("/api/ingest", response_model=IngestResponse)
 def ingest(req: IngestRequest, x_rxac_key: str | None = Header(default=None)):
     _auth(x_rxac_key)
+    global _clean_since_train
     scored = flagged = 0
     # Aggregate the worst anomaly per player in this batch -> verdicts.
     worst: dict[str, dict] = {}
     for ev in req.events:
         anomaly = model.score(ev.features)
         scored += 1
-        if store.add_event(ev.model_dump(), anomaly):
+        is_flag = store.add_event(ev.model_dump(), anomaly)
+        if is_flag:
             flagged += 1
+        else:
+            # Feed only non-violation samples into the streaming baseline so the
+            # learned "normal" stays clean, and count toward auto-retrain.
+            online.update(to_vector(ev.features))
+            _clean_since_train += 1
         cur = worst.get(ev.uuid)
         if cur is None or anomaly > cur["anomaly"]:
             worst[ev.uuid] = {"uuid": ev.uuid, "name": ev.name, "anomaly": anomaly}
+
+    _maybe_auto_retrain()
     return IngestResponse(
         received=len(req.events),
         scored=scored,

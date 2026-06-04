@@ -20,6 +20,7 @@ public final class ViolationTracker {
         double vl;
         long lastUpdate = System.currentTimeMillis();
         boolean punished;
+        long lastMitigateMs;
     }
 
     private final PlayerData data;
@@ -45,9 +46,12 @@ public final class ViolationTracker {
     public synchronized void fail(Check check, double amount, String debug) {
         Entry e = entry(check);
         decay(check, e);
-        e.vl += amount;
 
         RXAC plugin = RXAC.get();
+        // Single global knob: scales every violation. >1 = stricter, <1 = lenient.
+        double sensitivity = plugin.getConfig().getDouble("general.sensitivity", 1.0);
+        e.vl += amount * Math.max(0.1, sensitivity);
+
         PunishmentManager pm = plugin.getPunishmentManager();
 
         pm.alert(data, check, e.vl, debug);
@@ -56,6 +60,17 @@ public final class ViolationTracker {
         double fwd = plugin.getConfig().getDouble("ml.forward-vl-threshold", 5);
         if (e.vl >= fwd) {
             plugin.getMlBridge().reportViolation(data, check, e.vl, debug);
+        }
+
+        // Mitigation: mess with the suspect (slowness/blindness/etc.) once VL
+        // crosses a soft fraction of the threshold, before an outright ban.
+        if (plugin.getConfig().getBoolean("punishments.mitigation.enabled", false)) {
+            double frac = plugin.getConfig().getDouble("punishments.mitigation.at-vl-fraction", 0.6);
+            long now = System.currentTimeMillis();
+            if (e.vl >= check.getMaxVl() * frac && now - e.lastMitigateMs > 5000) {
+                e.lastMitigateMs = now;
+                pm.mitigate(data, check);
+            }
         }
 
         if (e.vl >= check.getMaxVl() && !e.punished) {

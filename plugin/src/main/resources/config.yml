@@ -8,8 +8,18 @@ general:
   enabled: true
   # When true, checks only alert staff and never punish (recommended at launch).
   alert-only: false
+  # THE one knob to tune everything: scales every violation amount.
+  #   0.5 = very lenient   1.0 = balanced (default)   1.5-2.0 = aggressive
+  sensitivity: 1.0
   # Prefix for staff alert messages.
   prefix: "&8[&cRXAC&8] "
+
+# Transaction-based lag compensation. Sends PING packets and times the PONG to
+# measure each player's precise round-trip latency, which sharpens reach rewind
+# and prediction tolerances. Leave on unless you have a reason not to.
+lag-compensation:
+  enabled: true
+  interval-ticks: 1
 
 ml:
   # Stream feature vectors + high-VL events to the ML service for secondary
@@ -89,16 +99,25 @@ checks:
       decay: 0.25
       # Max horizontal speed (b/t) allowed while using/eating/drawing/blocking.
       max-use-speed: 0.16
+    spider:
+      enabled: true
+      max-vl: 10
+      decay: 0.25
+    badpackets:
+      enabled: true
+      max-vl: 8
+      decay: 0.1
     prediction:
-      # Physics-prediction engine: compares actual motion to the legal envelope.
-      # The single strongest movement check. Buffered, so noise never punishes.
+      # "All possible inputs" physics engine: the player's motion must match the
+      # closest legal velocity. The single strongest movement check. Buffered &
+      # latency-scaled, so noise and high ping never punish.
       enabled: true
       max-vl: 20
       decay: 0.4
-      # Allowed |actual - predicted| vertical velocity before contributing VL.
+      # Allowed horizontal offset (blocks/tick) from the nearest legal velocity.
+      horizontal-tolerance: 0.06
+      # Allowed vertical-velocity offset before contributing VL.
       vertical-tolerance: 0.06
-      # Multiplier over the predicted max horizontal speed.
-      horizontal-tolerance: 1.10
   combat:
     reach:
       enabled: true
@@ -188,6 +207,17 @@ setback:
 # Punishment ladder. Triggered when a check's VL crosses its max-vl.
 punishments:
   alert: true
+  # Mitigation: mess with suspects (slowness/blindness/etc.) once VL crosses a
+  # fraction of the threshold — before any ban. Great for trolling cheaters.
+  mitigation:
+    enabled: false
+    at-vl-fraction: 0.6
+    duration-ticks: 100
+    # List of EFFECT:amplifier. Any vanilla PotionEffectType name works.
+    effects:
+      - "SLOW:2"
+      - "BLINDNESS:0"
+      - "CONFUSION:0"
   kick:
     enabled: true
     message: "&cRXAC &7| &fSuspicious activity detected."

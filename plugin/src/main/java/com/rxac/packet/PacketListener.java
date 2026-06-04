@@ -42,7 +42,8 @@ public final class PacketListener {
                 PacketType.Play.Client.POSITION_LOOK,
                 PacketType.Play.Client.LOOK,
                 PacketType.Play.Client.FLYING,
-                PacketType.Play.Client.ARM_ANIMATION) {
+                PacketType.Play.Client.ARM_ANIMATION,
+                PacketType.Play.Client.PONG) {
 
             @Override
             public void onPacketReceiving(PacketEvent event) {
@@ -52,6 +53,14 @@ public final class PacketListener {
 
                 PacketType type = event.getPacketType();
                 long now = System.currentTimeMillis();
+
+                if (type == PacketType.Play.Client.PONG) {
+                    // Confirm the transaction immediately on the netty thread so
+                    // the latency measurement isn't skewed by main-thread lag.
+                    int id = event.getPacket().getIntegers().read(0);
+                    rxac.getTransactionManager().onPong(data, id);
+                    return;
+                }
 
                 if (type == PacketType.Play.Client.ARM_ANIMATION) {
                     data.registerClick(now);

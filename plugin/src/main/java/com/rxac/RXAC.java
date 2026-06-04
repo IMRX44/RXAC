@@ -9,6 +9,7 @@ import com.rxac.ml.MLBridge;
 import com.rxac.packet.PacketListener;
 import com.rxac.player.PlayerDataManager;
 import com.rxac.predict.SetbackManager;
+import com.rxac.predict.TransactionManager;
 import com.rxac.punish.PunishmentManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -28,6 +29,7 @@ public final class RXAC extends JavaPlugin {
     private CheckManager checkManager;
     private PunishmentManager punishmentManager;
     private SetbackManager setbackManager;
+    private TransactionManager transactionManager;
     private MLBridge mlBridge;
     private PacketListener packetListener;
 
@@ -45,6 +47,7 @@ public final class RXAC extends JavaPlugin {
         this.mlBridge = new MLBridge(this);
         this.punishmentManager = new PunishmentManager(this);
         this.setbackManager = new SetbackManager(this);
+        this.transactionManager = new TransactionManager(this);
         this.playerDataManager = new PlayerDataManager();
         this.checkManager = new CheckManager(this);
 
@@ -61,6 +64,7 @@ public final class RXAC extends JavaPlugin {
         getCommand("rxac").setTabCompleter(command);
 
         mlBridge.start();
+        transactionManager.start();
 
         getLogger().info("RXAC enabled — " + checkManager.getChecks().size()
                 + " checks active. alert-only=" + getConfig().getBoolean("general.alert-only"));
@@ -69,6 +73,7 @@ public final class RXAC extends JavaPlugin {
     @Override
     public void onDisable() {
         if (packetListener != null) packetListener.unregister();
+        if (transactionManager != null) transactionManager.shutdown();
         if (mlBridge != null) mlBridge.shutdown();
         if (playerDataManager != null) playerDataManager.clear();
         getLogger().info("RXAC disabled.");
@@ -92,6 +97,10 @@ public final class RXAC extends JavaPlugin {
 
     public SetbackManager getSetbackManager() {
         return setbackManager;
+    }
+
+    public TransactionManager getTransactionManager() {
+        return transactionManager;
     }
 
     public MLBridge getMlBridge() {

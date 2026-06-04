@@ -79,6 +79,33 @@ public final class PlayerData {
     public boolean teleporting;
     public long lastTeleportMs;
 
+    // Precise round-trip latency measured via PING/PONG transactions (ms); -1
+    // until the first transaction confirms. Far more accurate than getPing().
+    public volatile double transactionPing = -1;
+    private final java.util.Map<Integer, Long> pendingTransactions =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void addTransaction(int id, long sendNano) {
+        pendingTransactions.put(id, sendNano);
+        // Guard against unbounded growth if a client never answers.
+        if (pendingTransactions.size() > 200) pendingTransactions.clear();
+    }
+
+    /** Returns the send-time (nanos) for a confirmed transaction, or null. */
+    public Long confirmTransaction(int id) {
+        return pendingTransactions.remove(id);
+    }
+
+    /** Best available latency estimate (transaction ping, else client ping). */
+    public int latencyMs() {
+        if (transactionPing >= 0) return (int) Math.round(transactionPing);
+        try {
+            return Math.max(0, getPlayer().getPing());
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
     public PlayerData(Player player) {
         this.player = player;
         this.uuid = player.getUniqueId();

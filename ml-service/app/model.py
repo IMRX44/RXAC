@@ -81,15 +81,19 @@ class AnomalyModel:
         a single weak signal from either source still surfaces — and obvious red
         flags (the heuristic) are never silently smoothed away by the model.
         """
+        from .online import online
+
+        vec = to_vector(features)
         heur = self._heuristic(features)
+        stream = online.score(vec)        # continuously-learned population outlier
+
+        base = max(heur * 0.9, stream)
         if self._pipeline is not None:
-            vec = to_vector(features)
             # IsolationForest.decision_function: higher = more normal.
             raw = float(self._pipeline.decision_function([vec])[0])
             iforest = float(min(1.0, max(0.0, 0.5 - raw)))
-            # Weighted blend, but let a strong heuristic dominate.
-            return float(max(0.7 * iforest + 0.3 * heur, heur * 0.9))
-        return heur
+            return float(max(base, 0.6 * iforest + 0.4 * max(heur, stream)))
+        return float(base)
 
     @staticmethod
     def _heuristic(f: dict) -> float:

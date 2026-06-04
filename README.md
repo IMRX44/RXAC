@@ -35,21 +35,39 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deep dive.
 
 ## Detection coverage (initial)
 
-**Movement:** **Prediction (physics engine)**, Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step, NoSlow, Velocity (anti-knockback).
-**Combat:** Reach (ping-aware), KillAura, AutoClicker / CPS, Aim, HitBox, FastBow.
-**World:** Scaffold, FastPlace, Nuker / FastBreak.
+**Movement:** **Prediction (all-inputs physics engine)**, Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step, NoSlow, Spider, BadPackets, Velocity (anti-knockback).
+**Combat:** Reach (transaction lag-comp + rewind), KillAura (5 modules), AutoClicker / CPS, Aim, HitBox, FastBow.
+**World:** Scaffold (multi-signal), FastPlace, Nuker / FastBreak.
+**Behavioral:** AI (streaming + IsolationForest, fed by the ML service).
 
 ### The prediction engine (flagship)
 
-`com.rxac.predict` implements a server-authoritative AABB **collision engine**
-(`Collisions`) and a **tick-by-tick physics predictor** (`PredictionEngine`):
-gravity, vertical drag, ground friction with per-block slipperiness (ice, slime),
-sprint-jump bursts, and full block collision. `PredictionCheck` compares a
-player's *actual* motion to this legal envelope instead of using fixed
-thresholds — so movement cheats can't simply stay "under a limit". When highly
-confident, the `SetbackManager` rubber-bands the player to their last valid
-position (opt-in via `setback.enabled`), neutralizing movement cheats in real
-time rather than just logging them.
+`com.rxac.predict` implements:
+
+- **`Collisions`** — a server-authoritative AABB collision engine (vanilla
+  axis-by-axis sweep, per-block bounding boxes).
+- **`MovementInputPredictor`** — the *"all possible inputs"* technique used by
+  top anti-cheats: it enumerates every legal client input
+  (forward/back/left/right × sprint × jump), runs vanilla physics for each, and
+  the player's actual motion must match the **closest** achievable velocity.
+  Magnitude-based bypasses become pointless — a cheat must land exactly on a
+  legal velocity, at which point it *is* vanilla.
+- **`TransactionManager`** — transaction-based lag compensation: PING/PONG
+  packets measure each player's *precise* round-trip latency, which scales
+  prediction tolerances and the reach-rewind window so high-ping players are
+  never false-flagged.
+- **`SetbackManager`** — rubber-bands the player to their last valid position on
+  high-confidence movement violations, neutralizing cheats in real time.
+
+### Self-adapting AI
+
+The ML service runs an **online streaming model** (`online.py`, Welford
+per-feature population statistics) that continuously learns what "normal" looks
+like *on your server* and flags statistical outliers with no training step —
+the honest core of "auto-detecting new bypasses". It is ensembled with an
+IsolationForest that **auto-retrains in the background** as clean data
+accumulates. High anomaly scores feed back into the `AI` check's violation
+level through the normal punishment pipeline.
 
 Every check produces a `CheckResult` with a violation level (VL). VLs decay over time and trigger configurable punishments (alert → kick → ban). High-VL events and full feature vectors are streamed to the ML service for secondary verification and offline retraining.
 
