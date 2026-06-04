@@ -79,6 +79,12 @@ checks:
       # Min fraction of expected knockback the player must take.
       min-horizontal: 0.5
       min-vertical: 0.5
+    noslow:
+      enabled: true
+      max-vl: 12
+      decay: 0.25
+      # Max horizontal speed (b/t) allowed while using/eating/drawing/blocking.
+      max-use-speed: 0.16
   combat:
     reach:
       enabled: true
@@ -86,6 +92,12 @@ checks:
       decay: 0.3
       # Survival max is ~3.0; we allow latency slack.
       max-reach: 3.12
+      # Extra reach (blocks) granted per ms of ping, capped by max-ping-slack.
+      max-ping-slack: 0.5
+    fastbow:
+      enabled: true
+      max-vl: 10
+      decay: 0.3
     killaura:
       enabled: true
       max-vl: 14
@@ -111,6 +123,16 @@ checks:
       decay: 0.3
       # Max melee reach used for the look-ray intersection test.
       max-reach: 3.5
+
+  player:
+    scaffold:
+      enabled: true
+      max-vl: 12
+      decay: 0.25
+      # Min downward pitch (deg) expected when bridging below yourself.
+      min-down-pitch: 30.0
+      # Faster than this between downward places is treated as a burst.
+      min-place-interval-ms: 110
 
 # Punishment ladder. Triggered when a check's VL crosses its max-vl.
 punishments:

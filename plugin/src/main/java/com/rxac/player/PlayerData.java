@@ -49,6 +49,8 @@ public final class PlayerData {
 
     // --- Combat ---------------------------------------------------------------
     public long lastAttackMs;
+    public long lastBlockPlaceMs;
+    public long bowDrawStartMs;
     public int lastTargetId = -1;
     private final Deque<long[]> recentTargets = new ArrayDeque<>();      // {entityId, timeMs}
 

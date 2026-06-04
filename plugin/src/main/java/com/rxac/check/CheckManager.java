@@ -3,6 +3,7 @@ package com.rxac.check;
 import com.rxac.RXAC;
 import com.rxac.check.combat.*;
 import com.rxac.check.movement.*;
+import com.rxac.check.player.*;
 import com.rxac.player.PlayerData;
 
 import java.util.ArrayList;
@@ -34,13 +35,16 @@ public final class CheckManager {
         checks.add(new PhaseCheck(plugin));
         checks.add(new JesusCheck(plugin));
         checks.add(new StepCheck(plugin));
+        checks.add(new NoSlowCheck(plugin));
         // Combat
         checks.add(new ReachCheck(plugin));
         checks.add(new KillAuraCheck(plugin));
         checks.add(new AutoClickerCheck(plugin));
         checks.add(new AimCheck(plugin));
         checks.add(new HitBoxCheck(plugin));
-        checks.add(new VelocityCheck(plugin));
+        checks.add(new FastBowCheck(plugin));
+        // Player / world interaction
+        checks.add(new ScaffoldCheck(plugin));
     }
 
     public void reloadAll() {
@@ -85,6 +89,20 @@ public final class CheckManager {
             if (c.isEnabled() && c.getCategory() == CheckCategory.MOVEMENT) {
                 safe(() -> c.onVelocity(data), c);
             }
+        }
+    }
+
+    public void dispatchBlockPlace(PlayerData data, BlockPlaceContext ctx) {
+        if (!active(data)) return;
+        for (Check c : checks) {
+            if (c.isEnabled()) safe(() -> c.onBlockPlace(data, ctx), c);
+        }
+    }
+
+    public void dispatchBowShoot(PlayerData data, float force, long drawMs) {
+        if (!active(data)) return;
+        for (Check c : checks) {
+            if (c.isEnabled()) safe(() -> c.onBowShoot(data, force, drawMs), c);
         }
     }
 

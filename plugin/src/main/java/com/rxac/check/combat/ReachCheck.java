@@ -21,12 +21,27 @@ public final class ReachCheck extends Check {
     @Override
     public void onAttack(PlayerData data, AttackContext ctx) {
         double max = cfgDouble("max-reach", 3.12);
+
+        // Ping-aware slack: a lagging player's target may be slightly stale, so
+        // we widen the allowance with latency (capped) to avoid false flags.
+        int ping = safePing(data);
+        double pingSlack = Math.min(cfgDouble("max-ping-slack", 0.5), ping * 0.0016);
+        double allowed = max + pingSlack;
+
         double reach = ctx.getReach();
-        if (reach > max) {
-            fail(data, Math.min(3.0, 1 + (reach - max) * 4),
-                    String.format("reach=%.3f>%.2f", reach, max));
+        if (reach > allowed) {
+            fail(data, Math.min(3.0, 1 + (reach - allowed) * 4),
+                    String.format("reach=%.3f>%.2f (ping=%d)", reach, allowed, ping));
         } else {
             reward(data, 0.5);
+        }
+    }
+
+    private int safePing(PlayerData data) {
+        try {
+            return Math.max(0, data.getPlayer().getPing());
+        } catch (Throwable t) {
+            return 0;   // getPing() may be unavailable on some forks
         }
     }
 }

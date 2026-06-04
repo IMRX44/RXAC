@@ -67,6 +67,12 @@ public abstract class Check {
     /** Called when the player should be taking knockback (PlayerVelocityEvent). */
     public void onVelocity(PlayerData data) {}
 
+    /** Called when the player places a block (BlockPlaceEvent). */
+    public void onBlockPlace(PlayerData data, BlockPlaceContext ctx) {}
+
+    /** Called when the player releases a bow shot, with draw force and time. */
+    public void onBowShoot(PlayerData data, float force, long drawMs) {}
+
     // --- Violation helpers ----------------------------------------------------
 
     /** Increase this check's violation level and emit an alert/punishment. */

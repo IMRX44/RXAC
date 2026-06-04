@@ -35,8 +35,9 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deep dive.
 
 ## Detection coverage (initial)
 
-**Movement:** Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step.
-**Combat:** Reach, KillAura, AutoClicker / CPS, Aim, HitBox, Velocity (anti-knockback).
+**Movement:** Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step, NoSlow, Velocity (anti-knockback).
+**Combat:** Reach (ping-aware), KillAura, AutoClicker / CPS, Aim, HitBox, FastBow.
+**World:** Scaffold.
 
 Every check produces a `CheckResult` with a violation level (VL). VLs decay over time and trigger configurable punishments (alert → kick → ban). High-VL events and full feature vectors are streamed to the ML service for secondary verification and offline retraining.
 

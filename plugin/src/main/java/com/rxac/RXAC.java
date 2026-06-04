@@ -4,6 +4,7 @@ import com.rxac.check.CheckManager;
 import com.rxac.command.RXACCommand;
 import com.rxac.listener.CombatListener;
 import com.rxac.listener.ConnectionListener;
+import com.rxac.listener.InteractionListener;
 import com.rxac.ml.MLBridge;
 import com.rxac.packet.PacketListener;
 import com.rxac.player.PlayerDataManager;
@@ -50,6 +51,7 @@ public final class RXAC extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new ConnectionListener(this), this);
         getServer().getPluginManager().registerEvents(new CombatListener(this), this);
+        getServer().getPluginManager().registerEvents(new InteractionListener(this), this);
 
         RXACCommand command = new RXACCommand(this);
         getCommand("rxac").setExecutor(command);
