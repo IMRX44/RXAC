@@ -37,15 +37,23 @@ public final class PlayerData {
     // --- Ground / air state ---------------------------------------------------
     public boolean clientOnGround;
     public boolean lastClientOnGround;
+    public boolean serverGround;       // server-side collision ground (this tick)
+    public boolean lastServerGround;   // server-side collision ground (previous tick)
     public int airTicks;
     public int groundTicks;
     public boolean inLiquid;
     public boolean nearGround;     // server-side bounding-box ground check
 
+    // Last position considered physically valid, for setback / rewind.
+    public org.bukkit.Location lastSafe;
+    public long lastSetbackMs;
+
     // --- Timing ---------------------------------------------------------------
     public long lastMovementMs;
     private final Deque<Long> flyingPacketTimes = new ArrayDeque<>();  // for TimerCheck
     private final Deque<Long> clickTimes = new ArrayDeque<>();          // for CPS
+    private final Deque<Long> placeTimes = new ArrayDeque<>();          // for FastPlace
+    private final Deque<Long> breakTimes = new ArrayDeque<>();          // for Nuker/FastBreak
 
     // --- Combat ---------------------------------------------------------------
     public long lastAttackMs;
@@ -121,6 +129,20 @@ public final class PlayerData {
     }
 
     public Deque<Long> getClickTimes() { return clickTimes; }
+
+    public int registerAndCountPlaces(long now) {
+        return registerAndCount(placeTimes, now);
+    }
+
+    public int registerAndCountBreaks(long now) {
+        return registerAndCount(breakTimes, now);
+    }
+
+    private static int registerAndCount(Deque<Long> q, long now) {
+        q.addLast(now);
+        while (!q.isEmpty() && now - q.peekFirst() > 1000L) q.pollFirst();
+        return q.size();
+    }
 
     public void registerTarget(int entityId, long now) {
         recentTargets.addLast(new long[]{entityId, now});

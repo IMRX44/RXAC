@@ -9,9 +9,11 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.events.PacketEvent;
 import com.rxac.RXAC;
 import com.rxac.player.PlayerData;
+import com.rxac.predict.Collisions;
 import com.rxac.util.MovementUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.util.BoundingBox;
 
 /**
  * Captures movement and swing packets through ProtocolLib.
@@ -86,11 +88,18 @@ public final class PacketListener {
                     // Server-authoritative environment context.
                     data.inLiquid = MovementUtil.inLiquid(player);
                     data.nearGround = MovementUtil.nearGround(player, 0.5);
+
+                    // Collision-based ground state, the basis of prediction.
+                    data.lastServerGround = data.serverGround;
+                    BoundingBox box = Collisions.playerBox(data.x, data.y, data.z);
+                    data.serverGround = Collisions.onGround(player.getWorld(), box);
+
                     if (data.clientOnGround) data.groundTicks++; else data.groundTicks = 0;
                     if (!data.clientOnGround && !data.nearGround) data.airTicks++; else data.airTicks = 0;
                     if (data.ticksSinceVelocity != Integer.MAX_VALUE) data.ticksSinceVelocity++;
                     data.lastMovementMs = now;
 
+                    rxac.getSetbackManager().markSafe(data);
                     rxac.getCheckManager().dispatchMovement(data);
                 });
             }

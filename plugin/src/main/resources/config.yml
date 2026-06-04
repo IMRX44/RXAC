@@ -85,6 +85,16 @@ checks:
       decay: 0.25
       # Max horizontal speed (b/t) allowed while using/eating/drawing/blocking.
       max-use-speed: 0.16
+    prediction:
+      # Physics-prediction engine: compares actual motion to the legal envelope.
+      # The single strongest movement check. Buffered, so noise never punishes.
+      enabled: true
+      max-vl: 20
+      decay: 0.4
+      # Allowed |actual - predicted| vertical velocity before contributing VL.
+      vertical-tolerance: 0.06
+      # Multiplier over the predicted max horizontal speed.
+      horizontal-tolerance: 1.10
   combat:
     reach:
       enabled: true
@@ -133,6 +143,26 @@ checks:
       min-down-pitch: 30.0
       # Faster than this between downward places is treated as a burst.
       min-place-interval-ms: 110
+    fastplace:
+      enabled: true
+      max-vl: 12
+      decay: 0.25
+      max-per-second: 9
+    nuker:
+      enabled: true
+      max-vl: 12
+      decay: 0.3
+      max-per-second: 8
+      # Max angle (deg) between look direction and the broken block.
+      max-angle: 75.0
+
+# Setback / rubber-band. When a high-confidence movement violation occurs the
+# player is teleported back to their last valid position, neutralizing movement
+# cheats in real time. Off by default — enable after tuning prediction tolerances.
+setback:
+  enabled: false
+  cooldown-ms: 400
+  log: true
 
 # Punishment ladder. Triggered when a check's VL crosses its max-vl.
 punishments:

@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -32,6 +33,13 @@ public final class InteractionListener implements Listener {
         plugin.getCheckManager().dispatchBlockPlace(data,
                 new BlockPlaceContext(event.getBlock(), event.getBlockAgainst(),
                         System.currentTimeMillis()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        PlayerData data = plugin.getPlayerDataManager().get(event.getPlayer());
+        if (data == null) return;
+        plugin.getCheckManager().dispatchBlockBreak(data, event.getBlock());
     }
 
     /** Record when the player starts drawing a bow. */

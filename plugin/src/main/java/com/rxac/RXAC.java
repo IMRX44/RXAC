@@ -8,6 +8,7 @@ import com.rxac.listener.InteractionListener;
 import com.rxac.ml.MLBridge;
 import com.rxac.packet.PacketListener;
 import com.rxac.player.PlayerDataManager;
+import com.rxac.predict.SetbackManager;
 import com.rxac.punish.PunishmentManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -26,6 +27,7 @@ public final class RXAC extends JavaPlugin {
     private PlayerDataManager playerDataManager;
     private CheckManager checkManager;
     private PunishmentManager punishmentManager;
+    private SetbackManager setbackManager;
     private MLBridge mlBridge;
     private PacketListener packetListener;
 
@@ -42,6 +44,7 @@ public final class RXAC extends JavaPlugin {
         // Core services.
         this.mlBridge = new MLBridge(this);
         this.punishmentManager = new PunishmentManager(this);
+        this.setbackManager = new SetbackManager(this);
         this.playerDataManager = new PlayerDataManager();
         this.checkManager = new CheckManager(this);
 
@@ -85,6 +88,10 @@ public final class RXAC extends JavaPlugin {
 
     public PunishmentManager getPunishmentManager() {
         return punishmentManager;
+    }
+
+    public SetbackManager getSetbackManager() {
+        return setbackManager;
     }
 
     public MLBridge getMlBridge() {

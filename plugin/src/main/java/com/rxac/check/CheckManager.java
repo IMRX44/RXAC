@@ -36,6 +36,7 @@ public final class CheckManager {
         checks.add(new JesusCheck(plugin));
         checks.add(new StepCheck(plugin));
         checks.add(new NoSlowCheck(plugin));
+        checks.add(new PredictionCheck(plugin));
         // Combat
         checks.add(new ReachCheck(plugin));
         checks.add(new KillAuraCheck(plugin));
@@ -45,6 +46,8 @@ public final class CheckManager {
         checks.add(new FastBowCheck(plugin));
         // Player / world interaction
         checks.add(new ScaffoldCheck(plugin));
+        checks.add(new FastPlaceCheck(plugin));
+        checks.add(new NukerCheck(plugin));
     }
 
     public void reloadAll() {
@@ -103,6 +106,13 @@ public final class CheckManager {
         if (!active(data)) return;
         for (Check c : checks) {
             if (c.isEnabled()) safe(() -> c.onBowShoot(data, force, drawMs), c);
+        }
+    }
+
+    public void dispatchBlockBreak(PlayerData data, org.bukkit.block.Block block) {
+        if (!active(data)) return;
+        for (Check c : checks) {
+            if (c.isEnabled()) safe(() -> c.onBlockBreak(data, block), c);
         }
     }
 

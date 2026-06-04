@@ -35,9 +35,21 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deep dive.
 
 ## Detection coverage (initial)
 
-**Movement:** Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step, NoSlow, Velocity (anti-knockback).
+**Movement:** **Prediction (physics engine)**, Speed, Fly, NoFall, Motion, Timer, Phase, Jesus (water-walk), Step, NoSlow, Velocity (anti-knockback).
 **Combat:** Reach (ping-aware), KillAura, AutoClicker / CPS, Aim, HitBox, FastBow.
-**World:** Scaffold.
+**World:** Scaffold, FastPlace, Nuker / FastBreak.
+
+### The prediction engine (flagship)
+
+`com.rxac.predict` implements a server-authoritative AABB **collision engine**
+(`Collisions`) and a **tick-by-tick physics predictor** (`PredictionEngine`):
+gravity, vertical drag, ground friction with per-block slipperiness (ice, slime),
+sprint-jump bursts, and full block collision. `PredictionCheck` compares a
+player's *actual* motion to this legal envelope instead of using fixed
+thresholds — so movement cheats can't simply stay "under a limit". When highly
+confident, the `SetbackManager` rubber-bands the player to their last valid
+position (opt-in via `setback.enabled`), neutralizing movement cheats in real
+time rather than just logging them.
 
 Every check produces a `CheckResult` with a violation level (VL). VLs decay over time and trigger configurable punishments (alert → kick → ban). High-VL events and full feature vectors are streamed to the ML service for secondary verification and offline retraining.
 

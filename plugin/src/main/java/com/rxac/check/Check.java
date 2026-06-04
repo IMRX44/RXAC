@@ -73,6 +73,9 @@ public abstract class Check {
     /** Called when the player releases a bow shot, with draw force and time. */
     public void onBowShoot(PlayerData data, float force, long drawMs) {}
 
+    /** Called when the player breaks a block (BlockBreakEvent). */
+    public void onBlockBreak(PlayerData data, org.bukkit.block.Block block) {}
+
     // --- Violation helpers ----------------------------------------------------
 
     /** Increase this check's violation level and emit an alert/punishment. */
