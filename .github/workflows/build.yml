@@ -1,0 +1,32 @@
+name: Build RXAC plugin
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "plugin/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build plugin JAR
+        working-directory: plugin
+        run: gradle jar --no-daemon --console=plain
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RXAC-plugin
+          path: plugin/build/libs/RXAC-*.jar
+          if-no-files-found: error

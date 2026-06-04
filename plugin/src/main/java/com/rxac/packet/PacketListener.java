@@ -32,6 +32,9 @@ public final class PacketListener {
 
     public void register() {
         ProtocolManager pm = ProtocolLibrary.getProtocolManager();
+        // Captured into a local because PacketAdapter has its own inherited
+        // `plugin` field (typed Plugin) that would otherwise shadow ours.
+        final RXAC rxac = this.plugin;
         this.adapter = new PacketAdapter(plugin, ListenerPriority.MONITOR,
                 PacketType.Play.Client.POSITION,
                 PacketType.Play.Client.POSITION_LOOK,
@@ -43,20 +46,20 @@ public final class PacketListener {
             public void onPacketReceiving(PacketEvent event) {
                 Player player = event.getPlayer();
                 if (player == null) return;
-                PlayerData data = plugin.getPlayerDataManager().getOrCreate(player);
+                PlayerData data = rxac.getPlayerDataManager().getOrCreate(player);
 
                 PacketType type = event.getPacketType();
                 long now = System.currentTimeMillis();
 
                 if (type == PacketType.Play.Client.ARM_ANIMATION) {
                     data.registerClick(now);
-                    Bukkit.getScheduler().runTask(plugin,
-                            () -> plugin.getCheckManager().dispatchSwing(data));
+                    Bukkit.getScheduler().runTask(rxac,
+                            () -> rxac.getCheckManager().dispatchSwing(data));
                     return;
                 }
 
                 // Movement family. Record timing immediately for TimerCheck.
-                long window = plugin.getConfig().getLong("checks.movement.timer.sample-window-ms", 1000);
+                long window = rxac.getConfig().getLong("checks.movement.timer.sample-window-ms", 1000);
                 data.markFlyingPacket(now, window);
 
                 PacketContainer packet = event.getPacket();
@@ -72,7 +75,7 @@ public final class PacketListener {
                 final float pitch = hasLook ? packet.getFloat().read(1) : Float.NaN;
                 final boolean onGround = readGround(packet);
 
-                Bukkit.getScheduler().runTask(plugin, () -> {
+                Bukkit.getScheduler().runTask(rxac, () -> {
                     if (!player.isOnline()) return;
                     data.lastClientOnGround = data.clientOnGround;
                     data.clientOnGround = onGround;
@@ -88,7 +91,7 @@ public final class PacketListener {
                     if (data.ticksSinceVelocity != Integer.MAX_VALUE) data.ticksSinceVelocity++;
                     data.lastMovementMs = now;
 
-                    plugin.getCheckManager().dispatchMovement(data);
+                    rxac.getCheckManager().dispatchMovement(data);
                 });
             }
         };

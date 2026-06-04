@@ -1,6 +1,5 @@
 plugins {
     java
-    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "com.rxac"
@@ -14,15 +13,18 @@ repositories {
 }
 
 dependencies {
+    // All provided at runtime by the server / ProtocolLib, so compileOnly:
+    // nothing needs to be shaded and the output jar stays tiny.
     compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
-    compileOnly("com.comphenix.protocol:ProtocolLib:5.1.0")
-    compileOnly("com.viaversion:viaversion-api:4.10.0")
-    // Gson is bundled with Paper at runtime; compileOnly avoids shading it.
+    compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
+    compileOnly("com.viaversion:viaversion-api:5.9.1")
     compileOnly("com.google.code.gson:gson:2.10.1")
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+    // Compile for Java 17 bytecode using whatever JDK (>=17) is running Gradle.
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 tasks {
@@ -35,11 +37,7 @@ tasks {
         inputs.properties(props)
         filesMatching("plugin.yml") { expand(props) }
     }
-    shadowJar {
-        archiveClassifier.set("")
-        // Relocate any future bundled libs here to avoid conflicts.
-    }
-    build {
-        dependsOn(shadowJar)
+    jar {
+        archiveBaseName.set("RXAC")
     }
 }
